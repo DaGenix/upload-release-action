@@ -52,9 +52,9 @@ async function upload_to_release(
     )
   }
 
-  const release_info: GetReleaseResp = await octokit.repos.getRelease(
-    release_id
-  )
+  const release_info: GetReleaseResp = await octokit.repos.getRelease({
+    release_id: release_id
+  })
 
   core.debug(`Uploading ${file} to ${asset_name} in release.`)
   const uploaded_asset: UploadAssetResp = await octokit.repos.uploadReleaseAsset(

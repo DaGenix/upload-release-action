@@ -2287,7 +2287,9 @@ function upload_to_release(release_id, file, asset_name, overwrite, octokit) {
         else {
             core.debug(`No pre-existing asset called ${asset_name} found in release. All good.`);
         }
-        const release_info = yield octokit.repos.getRelease(release_id);
+        const release_info = yield octokit.repos.getRelease({
+            release_id: release_id
+        });
         core.debug(`Uploading ${file} to ${asset_name} in release.`);
         const uploaded_asset = yield octokit.repos.uploadReleaseAsset({
             url: release_info.upload_url,
