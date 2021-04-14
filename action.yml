@@ -16,6 +16,7 @@ inputs:
     required: true
   asset_name:
     description: 'Name of the asset. When not provided will use the file name. Unused if file_glob is set to "true".'
+    required: true
   overwrite:
     description: 'Overwrite the release in case it already exists.'
   file_glob:

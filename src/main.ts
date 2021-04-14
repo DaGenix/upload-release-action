@@ -3,7 +3,6 @@ import {Octokit} from '@octokit/core'
 import {Endpoints} from '@octokit/types'
 import * as core from '@actions/core'
 import * as github from '@actions/github'
-import * as path from 'path'
 import * as glob from 'glob'
 
 type RepoAssetsResp = Endpoints['GET /repos/:owner/:repo/releases/:release_id/assets']['response']['data']
@@ -14,7 +13,6 @@ async function upload_to_release(
   release_id: string,
   file: string,
   asset_name: string,
-  tag: string,
   overwrite: boolean,
   octokit: Octokit
 ): Promise<undefined | string> {
@@ -38,7 +36,7 @@ async function upload_to_release(
   if (duplicate_asset !== undefined) {
     if (overwrite) {
       core.debug(
-        `An asset called ${asset_name} already exists in release ${tag} so we'll overwrite it.`
+        `An asset called ${asset_name} already exists in release so we'll overwrite it.`
       )
       await octokit.repos.deleteReleaseAsset({
         ...repo(),
@@ -50,7 +48,7 @@ async function upload_to_release(
     }
   } else {
     core.debug(
-      `No pre-existing asset called ${asset_name} found in release ${tag}. All good.`
+      `No pre-existing asset called ${asset_name} found in release. All good.`
     )
   }
 
@@ -58,7 +56,7 @@ async function upload_to_release(
     release_id
   )
 
-  core.debug(`Uploading ${file} to ${asset_name} in release ${tag}.`)
+  core.debug(`Uploading ${file} to ${asset_name} in release.`)
   const uploaded_asset: UploadAssetResp = await octokit.repos.uploadReleaseAsset(
     {
       url: release_info.upload_url,
@@ -98,14 +96,11 @@ async function run(): Promise<void> {
     // Get the inputs from the workflow file: https://github.com/actions/toolkit/tree/master/packages/core#inputsoutputs
     const token = core.getInput('repo_token', {required: true})
     const file = core.getInput('file', {required: true})
-    const tag = core
-      .getInput('tag', {required: true})
-      .replace('refs/tags/', '')
-      .replace('refs/heads/', '')
+    const asset_name = core.getInput('asset_name', {required: true})
+    const release_id = core.getInput('release_id', {required: true})
 
     const file_glob = core.getInput('file_glob') == 'true' ? true : false
     const overwrite = core.getInput('overwrite') == 'true' ? true : false
-    const release_id = core.getInput('release_id')
 
     const octokit: Octokit = github.getOctokit(token)
 
@@ -113,12 +108,10 @@ async function run(): Promise<void> {
       const files = glob.sync(file)
       if (files.length > 0) {
         for (const file of files) {
-          const asset_name = path.basename(file)
           const asset_download_url = await upload_to_release(
             release_id,
             file,
             asset_name,
-            tag,
             overwrite,
             octokit
           )
@@ -128,15 +121,10 @@ async function run(): Promise<void> {
         core.setFailed('No files matching the glob pattern found.')
       }
     } else {
-      const asset_name =
-        core.getInput('asset_name') !== ''
-          ? core.getInput('asset_name').replace(/\$tag/g, tag)
-          : path.basename(file)
       const asset_download_url = await upload_to_release(
         release_id,
         file,
         asset_name,
-        tag,
         overwrite,
         octokit
       )

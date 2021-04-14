@@ -2261,9 +2261,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs = __importStar(__webpack_require__(747));
 const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
-const path = __importStar(__webpack_require__(622));
 const glob = __importStar(__webpack_require__(402));
-function upload_to_release(release_id, file, asset_name, tag, overwrite, octokit) {
+function upload_to_release(release_id, file, asset_name, overwrite, octokit) {
     return __awaiter(this, void 0, void 0, function* () {
         const stat = fs.statSync(file);
         if (!stat.isFile()) {
@@ -2277,7 +2276,7 @@ function upload_to_release(release_id, file, asset_name, tag, overwrite, octokit
         const duplicate_asset = assets.find(a => a.name === asset_name);
         if (duplicate_asset !== undefined) {
             if (overwrite) {
-                core.debug(`An asset called ${asset_name} already exists in release ${tag} so we'll overwrite it.`);
+                core.debug(`An asset called ${asset_name} already exists in release so we'll overwrite it.`);
                 yield octokit.repos.deleteReleaseAsset(Object.assign(Object.assign({}, repo()), { asset_id: duplicate_asset.id }));
             }
             else {
@@ -2286,10 +2285,10 @@ function upload_to_release(release_id, file, asset_name, tag, overwrite, octokit
             }
         }
         else {
-            core.debug(`No pre-existing asset called ${asset_name} found in release ${tag}. All good.`);
+            core.debug(`No pre-existing asset called ${asset_name} found in release. All good.`);
         }
         const release_info = yield octokit.repos.getRelease(release_id);
-        core.debug(`Uploading ${file} to ${asset_name} in release ${tag}.`);
+        core.debug(`Uploading ${file} to ${asset_name} in release.`);
         const uploaded_asset = yield octokit.repos.uploadReleaseAsset({
             url: release_info.upload_url,
             name: asset_name,
@@ -2327,20 +2326,16 @@ function run() {
             // Get the inputs from the workflow file: https://github.com/actions/toolkit/tree/master/packages/core#inputsoutputs
             const token = core.getInput('repo_token', { required: true });
             const file = core.getInput('file', { required: true });
-            const tag = core
-                .getInput('tag', { required: true })
-                .replace('refs/tags/', '')
-                .replace('refs/heads/', '');
+            const asset_name = core.getInput('asset_name', { required: true });
+            const release_id = core.getInput('release_id', { required: true });
             const file_glob = core.getInput('file_glob') == 'true' ? true : false;
             const overwrite = core.getInput('overwrite') == 'true' ? true : false;
-            const release_id = core.getInput("release_id");
             const octokit = github.getOctokit(token);
             if (file_glob) {
                 const files = glob.sync(file);
                 if (files.length > 0) {
                     for (const file of files) {
-                        const asset_name = path.basename(file);
-                        const asset_download_url = yield upload_to_release(release_id, file, asset_name, tag, overwrite, octokit);
+                        const asset_download_url = yield upload_to_release(release_id, file, asset_name, overwrite, octokit);
                         core.setOutput('browser_download_url', asset_download_url);
                     }
                 }
@@ -2349,10 +2344,7 @@ function run() {
                 }
             }
             else {
-                const asset_name = core.getInput('asset_name') !== ''
-                    ? core.getInput('asset_name').replace(/\$tag/g, tag)
-                    : path.basename(file);
-                const asset_download_url = yield upload_to_release(release_id, file, asset_name, tag, overwrite, octokit);
+                const asset_download_url = yield upload_to_release(release_id, file, asset_name, overwrite, octokit);
                 core.setOutput('browser_download_url', asset_download_url);
             }
         }
