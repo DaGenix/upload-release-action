@@ -100,6 +100,7 @@ async function run(): Promise<void> {
     const file = core.getInput('file', {required: true})
     const asset_name = core.getInput('asset_name', {required: true})
     const release_id = core.getInput('release_id', {required: true})
+    core.debug(`RELEASE_ID: ${release_id}`)
 
     const file_glob = core.getInput('file_glob') == 'true' ? true : false
     const overwrite = core.getInput('overwrite') == 'true' ? true : false
