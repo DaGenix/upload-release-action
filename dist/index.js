@@ -2263,25 +2263,7 @@ const core = __importStar(__webpack_require__(470));
 const github = __importStar(__webpack_require__(469));
 const path = __importStar(__webpack_require__(622));
 const glob = __importStar(__webpack_require__(402));
-function get_release_by_tag(tag, prerelease, release_name, body, octokit) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            core.debug(`Getting release by tag ${tag}.`);
-            return yield octokit.repos.getReleaseByTag(Object.assign(Object.assign({}, repo()), { tag: tag }));
-        }
-        catch (error) {
-            // If this returns 404, we need to create the release first.
-            if (error.status === 404) {
-                core.debug(`Release for tag ${tag} doesn't exist yet so we'll create it now.`);
-                return yield octokit.repos.createRelease(Object.assign(Object.assign({}, repo()), { tag_name: tag, prerelease: prerelease, name: release_name, body: body }));
-            }
-            else {
-                throw error;
-            }
-        }
-    });
-}
-function upload_to_release(release, file, asset_name, tag, overwrite, octokit) {
+function upload_to_release(release_id, file, asset_name, tag, overwrite, octokit) {
     return __awaiter(this, void 0, void 0, function* () {
         const stat = fs.statSync(file);
         if (!stat.isFile()) {
@@ -2291,7 +2273,7 @@ function upload_to_release(release, file, asset_name, tag, overwrite, octokit) {
         const file_size = stat.size;
         const file_bytes = fs.readFileSync(file);
         // Check for duplicates.
-        const assets = yield octokit.paginate(octokit.repos.listReleaseAssets, Object.assign(Object.assign({}, repo()), { release_id: release.data.id }));
+        const assets = yield octokit.paginate(octokit.repos.listReleaseAssets, Object.assign(Object.assign({}, repo()), { release_id: release_id }));
         const duplicate_asset = assets.find(a => a.name === asset_name);
         if (duplicate_asset !== undefined) {
             if (overwrite) {
@@ -2306,9 +2288,10 @@ function upload_to_release(release, file, asset_name, tag, overwrite, octokit) {
         else {
             core.debug(`No pre-existing asset called ${asset_name} found in release ${tag}. All good.`);
         }
+        const release_info = yield octokit.repos.getRelease(release_id);
         core.debug(`Uploading ${file} to ${asset_name} in release ${tag}.`);
         const uploaded_asset = yield octokit.repos.uploadReleaseAsset({
-            url: release.data.upload_url,
+            url: release_info.upload_url,
             name: asset_name,
             data: file_bytes,
             headers: {
@@ -2350,17 +2333,14 @@ function run() {
                 .replace('refs/heads/', '');
             const file_glob = core.getInput('file_glob') == 'true' ? true : false;
             const overwrite = core.getInput('overwrite') == 'true' ? true : false;
-            const prerelease = core.getInput('prerelease') == 'true' ? true : false;
-            const release_name = core.getInput('release_name');
-            const body = core.getInput('body');
+            const release_id = core.getInput("release_id");
             const octokit = github.getOctokit(token);
-            const release = yield get_release_by_tag(tag, prerelease, release_name, body, octokit);
             if (file_glob) {
                 const files = glob.sync(file);
                 if (files.length > 0) {
                     for (const file of files) {
                         const asset_name = path.basename(file);
-                        const asset_download_url = yield upload_to_release(release, file, asset_name, tag, overwrite, octokit);
+                        const asset_download_url = yield upload_to_release(release_id, file, asset_name, tag, overwrite, octokit);
                         core.setOutput('browser_download_url', asset_download_url);
                     }
                 }
@@ -2372,7 +2352,7 @@ function run() {
                 const asset_name = core.getInput('asset_name') !== ''
                     ? core.getInput('asset_name').replace(/\$tag/g, tag)
                     : path.basename(file);
-                const asset_download_url = yield upload_to_release(release, file, asset_name, tag, overwrite, octokit);
+                const asset_download_url = yield upload_to_release(release_id, file, asset_name, tag, overwrite, octokit);
                 core.setOutput('browser_download_url', asset_download_url);
             }
         }

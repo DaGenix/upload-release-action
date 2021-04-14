@@ -7,44 +7,11 @@ import * as path from 'path'
 import * as glob from 'glob'
 
 type RepoAssetsResp = Endpoints['GET /repos/:owner/:repo/releases/:release_id/assets']['response']['data']
-type ReleaseByTagResp = Endpoints['GET /repos/:owner/:repo/releases/tags/:tag']['response']
-type CreateReleaseResp = Endpoints['POST /repos/:owner/:repo/releases']['response']
+type GetReleaseResp = Endpoints['GET /repos/:owner/:repo/releases/:release_id']['response']['data']
 type UploadAssetResp = Endpoints['POST /repos/:owner/:repo/releases/:release_id/assets{?name,label}']['response']
 
-async function get_release_by_tag(
-  tag: string,
-  prerelease: boolean,
-  release_name: string,
-  body: string,
-  octokit: Octokit
-): Promise<ReleaseByTagResp | CreateReleaseResp> {
-  try {
-    core.debug(`Getting release by tag ${tag}.`)
-    return await octokit.repos.getReleaseByTag({
-      ...repo(),
-      tag: tag
-    })
-  } catch (error) {
-    // If this returns 404, we need to create the release first.
-    if (error.status === 404) {
-      core.debug(
-        `Release for tag ${tag} doesn't exist yet so we'll create it now.`
-      )
-      return await octokit.repos.createRelease({
-        ...repo(),
-        tag_name: tag,
-        prerelease: prerelease,
-        name: release_name,
-        body: body
-      })
-    } else {
-      throw error
-    }
-  }
-}
-
 async function upload_to_release(
-  release: ReleaseByTagResp | CreateReleaseResp,
+  release_id: string,
   file: string,
   asset_name: string,
   tag: string,
@@ -64,7 +31,7 @@ async function upload_to_release(
     octokit.repos.listReleaseAssets,
     {
       ...repo(),
-      release_id: release.data.id
+      release_id: release_id
     }
   )
   const duplicate_asset = assets.find(a => a.name === asset_name)
@@ -87,10 +54,14 @@ async function upload_to_release(
     )
   }
 
+  const release_info: GetReleaseResp = await octokit.repos.getRelease(
+    release_id
+  )
+
   core.debug(`Uploading ${file} to ${asset_name} in release ${tag}.`)
   const uploaded_asset: UploadAssetResp = await octokit.repos.uploadReleaseAsset(
     {
-      url: release.data.upload_url,
+      url: release_info.upload_url,
       name: asset_name,
       data: file_bytes,
       headers: {
@@ -134,18 +105,9 @@ async function run(): Promise<void> {
 
     const file_glob = core.getInput('file_glob') == 'true' ? true : false
     const overwrite = core.getInput('overwrite') == 'true' ? true : false
-    const prerelease = core.getInput('prerelease') == 'true' ? true : false
-    const release_name = core.getInput('release_name')
-    const body = core.getInput('body')
+    const release_id = core.getInput('release_id')
 
     const octokit: Octokit = github.getOctokit(token)
-    const release = await get_release_by_tag(
-      tag,
-      prerelease,
-      release_name,
-      body,
-      octokit
-    )
 
     if (file_glob) {
       const files = glob.sync(file)
@@ -153,7 +115,7 @@ async function run(): Promise<void> {
         for (const file of files) {
           const asset_name = path.basename(file)
           const asset_download_url = await upload_to_release(
-            release,
+            release_id,
             file,
             asset_name,
             tag,
@@ -171,7 +133,7 @@ async function run(): Promise<void> {
           ? core.getInput('asset_name').replace(/\$tag/g, tag)
           : path.basename(file)
       const asset_download_url = await upload_to_release(
-        release,
+        release_id,
         file,
         asset_name,
         tag,
