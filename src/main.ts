@@ -54,6 +54,12 @@ async function upload_to_release(
     )
   }
 
+  core.debug(`before release_info1`)
+  const release_info1 = await octokit.repos.getRelease({
+    release_id: release_id
+  })
+  core.debug(`release_info1: ${release_info1}`)
+
   const release_info: GetReleaseResp = await octokit.repos.getRelease({
     release_id: release_id
   })

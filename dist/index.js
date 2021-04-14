@@ -2270,7 +2270,9 @@ function upload_to_release(release_id, file, asset_name, overwrite, octokit) {
             return;
         }
         const file_size = stat.size;
+        core.debug(`File: ${file}`);
         const file_bytes = fs.readFileSync(file);
+        core.debug(`Read File: ${file}`);
         // Check for duplicates.
         const assets = yield octokit.paginate(octokit.repos.listReleaseAssets, Object.assign(Object.assign({}, repo()), { release_id: release_id }));
         const duplicate_asset = assets.find(a => a.name === asset_name);
@@ -2287,6 +2289,11 @@ function upload_to_release(release_id, file, asset_name, overwrite, octokit) {
         else {
             core.debug(`No pre-existing asset called ${asset_name} found in release. All good.`);
         }
+        core.debug(`before release_info1`);
+        const release_info1 = yield octokit.repos.getRelease({
+            release_id: release_id
+        });
+        core.debug(`release_info1: ${release_info1}`);
         const release_info = yield octokit.repos.getRelease({
             release_id: release_id
         });
@@ -2330,6 +2337,7 @@ function run() {
             const file = core.getInput('file', { required: true });
             const asset_name = core.getInput('asset_name', { required: true });
             const release_id = core.getInput('release_id', { required: true });
+            core.debug(`RELEASE_ID: ${release_id}`);
             const file_glob = core.getInput('file_glob') == 'true' ? true : false;
             const overwrite = core.getInput('overwrite') == 'true' ? true : false;
             const octokit = github.getOctokit(token);
